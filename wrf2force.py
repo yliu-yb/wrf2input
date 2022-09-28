@@ -8,7 +8,19 @@ class wrftoforce():
         self.file = file
         self.zlevels = zlevels
         self.outfile = outfile
-
+        self.dt = []
+        self.U = []
+        self.V = []
+        self.W = []
+        self.TH = []
+        self.Q = []
+        self.P = []
+        self.lon = []
+        self.lat = []
+        self.getdata()
+        print('1')
+        self.write2nc()
+        print('2')
     def getdata(self):
         ncfile = Dataset(self.file)
         disable_xarray()
@@ -24,8 +36,16 @@ class wrftoforce():
         Q = getvar(ncfile, 'QVAPOR', timeidx=ALL_TIMES)
         T = T + 300
 
-        self.lon = lons[:, y, :]
-        self.lat = lats[:, :, x]
+        times = ncfile.variables["Times"]
+        dt = []
+        for time in times:
+            strDatatime = ''
+            for b in time:
+                strDatatime += bytes.decode(b)
+            dt.append(datetime.datetime.strptime(strDatatime, '%Y-%m-%d_%H:%M:%S'))
+        self.dt = dt
+        self.lon = lons[0, y, :]
+        self.lat = lats[0, :, x]
 
         self.U = np.array(interplevel(U[:, :, :, 1:], z[:, :, :, :], self.zlevels))
         self.V = np.array(interplevel(V[:, :, 1:, :], z[:, :, :, :], self.zlevels))
@@ -39,7 +59,7 @@ class wrftoforce():
     def write2nc(self):
         ncfile = Dataset(self.outfile, mode='w', format='NETCDF4_CLASSIC')
 
-        ncfile.title = 'initial data for Small-scale Numerical Forcast Model'
+        ncfile.title = 'force data for Small-scale Numerical Forcast Model'
         ncfile.subtitle = self.outfile
 
         time_dim = ncfile.createDimension('time', None)
@@ -52,6 +72,7 @@ class wrftoforce():
 
         # Define two variables with the same names as dimensions,
         # a conventional way to define "coordinate variables".
+
         time = ncfile.createVariable('time', np.int32, ('time',))
         time.units = 'seconds since 1970-01-01 00:00:00'
         time.long_name = 'time'
@@ -65,7 +86,6 @@ class wrftoforce():
         height = ncfile.createVariable('height', np.float32, ('height',))
         height.units = 'm'
         height.long_name = 'geography height'
-
         # Define a 3D variable to hold the data
         TH_bottom = ncfile.createVariable('theta_bottom', np.float64, ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
         TH_bottom.units = 'K'  # degrees Kelvin
@@ -142,63 +162,59 @@ class wrftoforce():
         V_north.standard_name = 'north boundary y-component velocity'  # Vis is a CF standard name
 
         # ---
-        W_bottom = ncfile.createWariable('W_bottom', np.float64,
-                                         ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
-        W_bottom.units = 'ms-1'  
+        W_bottom = ncfile.createVariable('W_bottom', np.float64, ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
+        W_bottom.units = 'ms-1'
         W_bottom.standard_name = 'bottom boundary vertical velocity'  # Wis is a CF standard name
 
-        W_top = ncfile.createWariable('W_top', np.float64,
-                                      ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
+        W_top = ncfile.createVariable('W_top', np.float64, ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
         W_top.units = 'ms-1'  
         W_top.standard_name = 'top boundary vertical velocity'  # Wis is a CF standard name
 
-        W_west = ncfile.createWariable('W_west', np.float64,
-                                       ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
+        W_west = ncfile.createVariable('W_west', np.float64, ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
         W_west.units = 'ms-1'
         W_west.standard_name = 'west boundary vertical velocity'  # Wis is a CF standard name
 
-        W_east = ncfile.createWariable('W_east', np.float64,
-                                       ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
+        W_east = ncfile.createVariable('W_east', np.float64, ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
         W_east.units = 'ms-1'
         W_east.standard_name = 'east boundary vertical velocity'  # Wis is a CF standard name
 
-        W_south = ncfile.createWariable('W_south', np.float64,
+        W_south = ncfile.createVariable('W_south', np.float64,
                                         ('time', 'height', 'lon'))  # note: unlimited dimension is leftmost
         W_south.units = 'ms-1'
         W_south.standard_name = 'south boundary vertical velocity'  # Wis is a CF standard name
 
-        W_north = ncfile.createWariable('W_north', np.float64,
+        W_north = ncfile.createVariable('W_north', np.float64,
                                         ('time', 'height', 'lon'))  # note: unlimited dimension is leftmost
         W_north.units = 'ms-1'
         W_north.standard_name = 'north boundary vertical velocity'  # Wis is a CF standard name
 
         # ---------------
-        P_bottom = ncfile.createPariable('P_bottom', np.float64,
+        P_bottom = ncfile.createVariable('P_bottom', np.float64,
                                          ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
         P_bottom.units = 'hPa'
         P_bottom.standard_name = 'bottom boundary pressure'  # Pis is a CF standard name
 
-        P_top = ncfile.createPariable('P_top', np.float64,
+        P_top = ncfile.createVariable('P_top', np.float64,
                                       ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
         P_top.units = 'hPa'
         P_top.standard_name = 'top boundary pressure'  # Pis is a CF standard name
 
-        P_west = ncfile.createPariable('P_west', np.float64,
+        P_west = ncfile.createVariable('P_west', np.float64,
                                        ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
         P_west.units = 'hPa'
         P_west.standard_name = 'west boundary pressure'  # Pis is a CF standard name
 
-        P_east = ncfile.createPariable('P_east', np.float64,
+        P_east = ncfile.createVariable('P_east', np.float64,
                                        ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
         P_east.units = 'hPa'
         P_east.standard_name = 'east boundary pressure'  # Pis is a CF standard name
 
-        P_south = ncfile.createPariable('P_south', np.float64,
+        P_south = ncfile.createVariable('P_south', np.float64,
                                         ('time', 'height', 'lon'))  # note: unlimited dimension is leftmost
         P_south.units = 'hPa'
         P_south.standard_name = 'south boundary pressure'  # Pis is a CF standard name
 
-        P_north = ncfile.createPariable('P_north', np.float64,
+        P_north = ncfile.createVariable('P_north', np.float64,
                                         ('time', 'height', 'lon'))  # note: unlimited dimension is leftmost
         P_north.units = 'hPa'
         P_north.standard_name = 'north boundary pressure'  # Pis is a CF standard name
@@ -209,6 +225,7 @@ class wrftoforce():
         lat = self.lat
         lon = self.lon
         height = self.zlevels
+        time = [(i - datetime.datetime(1970,1,1)).total_seconds() for i in self.dt]
 
         # write 3d data
         TH_bottom = self.TH[:, 0, :, :]
@@ -221,8 +238,10 @@ class wrftoforce():
         # P = self.P
 
         # read data back from variable (by slicing it), print min and max
+        print("temp.shape:", TH_bottom.shape)
         print("-- Min/Max values:", TH_bottom[:, :, :].min(), TH_bottom[:, :, :].max())
         print("-- Min/Max values:", TH_top[:, :, :].min(), TH_top[:, :, :].max())
+        print(time[:])
 
         # print("-- Min/Max values:", U[:, :, :].min(), U[:, :, :].max())
         # print("-- Min/Max values:", V[:, :, :].min(), V[:, :, :].max())
@@ -231,3 +250,11 @@ class wrftoforce():
 
         ncfile.close()
         pass
+
+if __name__ == '__main__':
+    zlevels = []
+    zlevels.append(250)
+    for i in range(0, 22):
+        zlevels.append(300 + i * 100)
+    zlevels.append(2450)
+    wrf2force = wrftoforce('/home/yl/wrf/wrfv4.4/WRF/test/data_save/model_drive_data/wrfout_d03_2016-06-01_05:00:00', zlevels, 'force_2016-06-01_05:00:00.nc')
