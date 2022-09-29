@@ -2,6 +2,7 @@ from netCDF4 import Dataset
 from wrf import getvar, ll_to_xy, disable_xarray,  ALL_TIMES, interplevel
 import datetime
 import numpy as np
+from common import temperature_from_potential_temperature, calc_density
 
 class wrftoinitial():
     def __init__(self, file, dt, zlevels, outfile):
@@ -9,6 +10,7 @@ class wrftoinitial():
         self.dt = dt
         self.outfile = outfile
         self.zlevels = zlevels
+        self.density = []
         self.U = []
         self.V = []
         self.W = []
@@ -45,6 +47,9 @@ class wrftoinitial():
         self.Q = np.array(interplevel(Q[t_idx, :, :, :], z[t_idx,:,:,:], self.zlevels))
         self.P = np.array(interplevel(p[t_idx, :, :, :], z[t_idx,:,:,:], self.zlevels))
 
+        # density = np.zeros((len(self.zlevels), len(self.lat), len(self.lon)))
+        self.density = calc_density(temperature_from_potential_temperature(self.TH, self.P) ,self.P * 100)
+
         ncfile.close()
     def write2nc(self):
         ncfile = Dataset(self.outfile, mode='w', format='NETCDF4_CLASSIC')
@@ -69,6 +74,11 @@ class wrftoinitial():
         height.long_name = 'geography height'
 
         # Define a 3D variable to hold the data
+        DENSITY = ncfile.createVariable('density', np.float64,
+                                   ('height', 'lat', 'lon'))  # note: unlimited dimension is leftmost
+        DENSITY.units = 'kgm-3'
+        DENSITY.standard_name = 'density'  # this is a CF standard name
+
         TH = ncfile.createVariable('theta', np.float64, ('height', 'lat', 'lon'))  # note: unlimited dimension is leftmost
         TH.units = 'K'  # degrees Kelvin
         TH.standard_name = 'potential temperature'  # this is a CF standard name
@@ -99,6 +109,7 @@ class wrftoinitial():
         height = self.zlevels
 
         # write 3d data
+        DENSITY = self.density
         TH = self.TH
         U = self.U
         V = self.V
@@ -106,6 +117,7 @@ class wrftoinitial():
         P = self.P
 
         # read data back from variable (by slicing it), print min and max
+        print("-- Min/Max values:", DENSITY[:, :, :].min(), DENSITY[:, :, :].max())
         print("-- Min/Max values:", TH[:, :, :].min(), TH[:, :, :].max())
         print("-- Min/Max values:", U[:, :, :].min(), U[:, :, :].max())
         print("-- Min/Max values:", V[:, :, :].min(), V[:, :, :].max())
@@ -121,4 +133,3 @@ if __name__ == '__main__':
         zlevels.append(300 + i * 100)
     zlevels.append(2450)
     wrf2ini = wrftoinitial('/home/yl/wrf/wrfv4.4/WRF/test/data_save/model_drive_data/wrfout_d03_2016-06-01_05:00:00', '', zlevels, 'init_2016-06-01_05:00:00.nc')
-    pass

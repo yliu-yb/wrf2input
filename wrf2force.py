@@ -2,12 +2,14 @@ from netCDF4 import Dataset
 from wrf import getvar, ll_to_xy, disable_xarray,  ALL_TIMES, interplevel
 import datetime
 import numpy as np
+from common import temperature_from_potential_temperature, calc_density
 
 class wrftoforce():
     def __init__(self, file, zlevels, outfile):
         self.file = file
         self.zlevels = zlevels
         self.outfile = outfile
+        self.DENSITY = []
         self.dt = []
         self.U = []
         self.V = []
@@ -52,8 +54,9 @@ class wrftoforce():
         self.Q = np.array(interplevel(Q[:, :, :, :], z[:, :, :, :], self.zlevels))
         self.P = np.array(interplevel(p[:, :, :, :], z[:, :, :, :], self.zlevels))
 
-        ncfile.close()
+        self.DENSITY = calc_density(temperature_from_potential_temperature(self.TH, self.P), self.P * 100)
 
+        ncfile.close()
     def write2nc(self):
         ncfile = Dataset(self.outfile, mode='w', format='NETCDF4_CLASSIC')
 
@@ -81,7 +84,39 @@ class wrftoforce():
         height = ncfile.createVariable('height', np.float32, ('height',))
         height.units = 'm'
         height.long_name = 'geography height'
+        
         # Define a 3D variable to hold the data
+        DENSITY_bottom = ncfile.createVariable('density_bottom', np.float64,
+                                          ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
+        DENSITY_bottom.units = 'kgm-3'  # degrees kgm-3elvin
+        DENSITY_bottom.standard_name = 'bottom boundary density'  # this is a CF standard name
+
+        DENSITY_top = ncfile.createVariable('density_top', np.float64,
+                                       ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
+        DENSITY_top.units = 'kgm-3'  # degrees kgm-3elvin
+        DENSITY_top.standard_name = 'top boundary density'  # this is a CF standard name
+
+        DENSITY_west = ncfile.createVariable('density_west', np.float64,
+                                        ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
+        DENSITY_west.units = 'kgm-3'  # degrees kgm-3elvin
+        DENSITY_west.standard_name = 'west boundary density'  # this is a CF standard name
+
+        DENSITY_east = ncfile.createVariable('density_east', np.float64,
+                                        ('time', 'height', 'lat'))  # note: unlimited dimension is leftmost
+        DENSITY_east.units = 'kgm-3'  # degrees kgm-3elvin
+        DENSITY_east.standard_name = 'east boundary density'  # this is a CF standard name
+
+        DENSITY_south = ncfile.createVariable('density_south', np.float64,
+                                         ('time', 'height', 'lon'))  # note: unlimited dimension is leftmost
+        DENSITY_south.units = 'kgm-3'  # degrees kgm-3elvin
+        DENSITY_south.standard_name = 'south boundary density'  # this is a CF standard name
+
+        DENSITY_north = ncfile.createVariable('density_north', np.float64,
+                                         ('time', 'height', 'lon'))  # note: unlimited dimension is leftmost
+        DENSITY_north.units = 'kgm-3'  # degrees kgm-3elvin
+        DENSITY_north.standard_name = 'north boundary density'  # this is a CF standard name
+        # ------------
+
         TH_bottom = ncfile.createVariable('theta_bottom', np.float64, ('time', 'lat', 'lon'))  # note: unlimited dimension is leftmost
         TH_bottom.units = 'K'  # degrees Kelvin
         TH_bottom.standard_name = 'bottom boundary potential temperature'  # this is a CF standard name
@@ -215,7 +250,6 @@ class wrftoforce():
         P_north.standard_name = 'north boundary pressure'  # Pis is a CF standard name
         # -------------
 
-
         # Write latitudes, longitudes, height, time
         lat = self.lat
         lon = self.lon
@@ -223,6 +257,13 @@ class wrftoforce():
         time[:] = [(i - datetime.datetime(1970,1,1)).total_seconds() for i in self.dt]
 
         # write 3d data
+        DENSITY_bottom = self.DENSITY[:, 0, :, :]
+        DENSITY_top = self.DENSITY[:, len(self.zlevels) - 1, :, :]
+        DENSITY_west = self.DENSITY[:, :, :, 0]
+        DENSITY_east = self.DENSITY[:, :, :, len(self.lat) - 1]
+        DENSITY_south = self.DENSITY[:, :, 0, :]
+        DENSITY_north = self.DENSITY[:, :, len(self.lon) - 1, :]
+
         TH_bottom = self.TH[:, 0, :, :]
         TH_top = self.TH[:, len(self.zlevels) - 1, :, :]
         TH_west = self.TH[:, :, :, 0]
@@ -262,11 +303,6 @@ class wrftoforce():
         print("temp.shape:", TH_bottom.shape)
         print("-- Min/Max values:", TH_bottom[:, :, :].min(), TH_bottom[:, :, :].max())
         print("-- Min/Max values:", TH_top[:, :, :].min(), TH_top[:, :, :].max())
-
-        # print("-- Min/Max values:", U[:, :, :].min(), U[:, :, :].max())
-        # print("-- Min/Max values:", V[:, :, :].min(), V[:, :, :].max())
-        # print("-- Min/Max values:", W[:, :, :].min(), W[:, :, :].max())
-        # print("-- Min/Max values:", P[:, :, :].min(), P[:, :, :].max())
 
         ncfile.close()
         pass
