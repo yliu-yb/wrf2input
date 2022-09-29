@@ -55,8 +55,6 @@ class wrftoinitial():
         lev_dim = ncfile.createDimension('height', len(self.zlevels))
         lat_dim = ncfile.createDimension('lat', len(self.lat))
         lon_dim = ncfile.createDimension('lon', len(self.lon))
-        for dim in ncfile.dimensions.items():
-            print(dim)
 
         # Define two variables with the same names as dimensions,
         # a conventional way to define "coordinate variables".

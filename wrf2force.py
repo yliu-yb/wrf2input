@@ -18,9 +18,7 @@ class wrftoforce():
         self.lon = []
         self.lat = []
         self.getdata()
-        print('1')
         self.write2nc()
-        print('2')
     def getdata(self):
         ncfile = Dataset(self.file)
         disable_xarray()
@@ -67,15 +65,12 @@ class wrftoforce():
         lat_dim = ncfile.createDimension('lat', len(self.lat))
         lon_dim = ncfile.createDimension('lon', len(self.lon))
 
-        for dim in ncfile.dimensions.items():
-            print(dim)
-
         # Define two variables with the same names as dimensions,
         # a conventional way to define "coordinate variables".
 
-        time = ncfile.createVariable('time', np.int32, ('time',))
-        time.units = 'seconds since 1970-01-01 00:00:00'
-        time.long_name = 'time'
+        time = ncfile.createVariable('time', np.float64, ('time',))
+        time.units = 's'
+        time.long_name = 'seconds since 1970-01-01 00:00:00'
 
         lat = ncfile.createVariable('lat', np.float32, ('lat',))
         lat.units = 'degrees_north'
@@ -221,27 +216,52 @@ class wrftoforce():
         # -------------
 
 
-        # Write latitudes, longitudes, height
+        # Write latitudes, longitudes, height, time
         lat = self.lat
         lon = self.lon
         height = self.zlevels
-        time = [(i - datetime.datetime(1970,1,1)).total_seconds() for i in self.dt]
+        time[:] = [(i - datetime.datetime(1970,1,1)).total_seconds() for i in self.dt]
 
         # write 3d data
         TH_bottom = self.TH[:, 0, :, :]
         TH_top = self.TH[:, len(self.zlevels) - 1, :, :]
+        TH_west = self.TH[:, :, :, 0]
+        TH_east = self.TH[:, :, :, len(self.lat) - 1]
+        TH_south = self.TH[:, :, 0, :]
+        TH_north = self.TH[:, :, len(self.lon) - 1, :]
 
-        # TH = self.TH
-        # U = self.U
-        # V = self.V
-        # W = self.W
-        # P = self.P
+        U_bottom = self.U[:, 0, :, :]
+        U_top = self.U[:, len(self.zlevels) - 1, :, :]
+        U_west = self.U[:, :, :, 0]
+        U_east = self.U[:, :, :, len(self.lat) - 1]
+        U_south = self.U[:, :, 0, :]
+        U_north = self.U[:, :, len(self.lon) - 1, :]
+        
+        V_bottom = self.V[:, 0, :, :]
+        V_top = self.V[:, len(self.zlevels) - 1, :, :]
+        V_west = self.V[:, :, :, 0]
+        V_east = self.V[:, :, :, len(self.lat) - 1]
+        V_south = self.V[:, :, 0, :]
+        V_north = self.V[:, :, len(self.lon) - 1, :]
+        
+        W_bottom = self.W[:, 0, :, :]
+        W_top = self.W[:, len(self.zlevels) - 1, :, :]
+        W_west = self.W[:, :, :, 0]
+        W_east = self.W[:, :, :, len(self.lat) - 1]
+        W_south = self.W[:, :, 0, :]
+        W_north = self.W[:, :, len(self.lon) - 1, :]
+
+        P_bottom = self.P[:, 0, :, :]
+        P_top = self.P[:, len(self.zlevels) - 1, :, :]
+        P_west = self.P[:, :, :, 0]
+        P_east = self.P[:, :, :, len(self.lat) - 1]
+        P_south = self.P[:, :, 0, :]
+        P_north = self.P[:, :, len(self.lon) - 1, :]
 
         # read data back from variable (by slicing it), print min and max
         print("temp.shape:", TH_bottom.shape)
         print("-- Min/Max values:", TH_bottom[:, :, :].min(), TH_bottom[:, :, :].max())
         print("-- Min/Max values:", TH_top[:, :, :].min(), TH_top[:, :, :].max())
-        print(time[:])
 
         # print("-- Min/Max values:", U[:, :, :].min(), U[:, :, :].max())
         # print("-- Min/Max values:", V[:, :, :].min(), V[:, :, :].max())
